@@ -1,12 +1,13 @@
 <!DOCTYPE html>
 <html>
+<body>
 
 <head>
     <link rel="stylesheet" href="style.css">
 </head>
 
 <div class="topimg">
-    <img src="./img/topimg.png">
+    <img src="img/topimg.png">
     <div class="imgcorner-text">Flowfield Pathfinding</div>
 </div>
 
@@ -15,17 +16,83 @@
     <div class="dropdown">
         <button class="dropdown-btn">Steps</button>
         <div class="dropdown-content">
-            <a href="#">Map Partitioning</a>
-            <a href="#">Cost Field</a>
-            <a href="#">Portal Generation</a>
-            <a href="#">Approximate Path Calculation</a>
-            <a href="#">Integration Field</a>
-            <a href="#">Flow Field</a>
+            <a href="#" onclick="changePage(this)">Map Partitioning</a>
+            <a href="#" onclick="changePage(this)">Cost Field</a>
+            <a href="#" onclick="changePage(this)">Portal Generation</a>
+            <a href="#" onclick="changePage(this)">Approximate Path Calculation</a>
+            <a href="#" onclick="changePage(this)">Integration Field</a>
+            <a href="#" onclick="changePage(this)">Flow Field</a>
         </div>
     </div>
     <a href="#">Bibliography</a>
     <a href="#">About</a>
 </div>
 
+<div class="infobox" data-title="Map Partitioning">
+    <h1>Map Partitioning</h1>
+    <p>The map is divided into sectors, each with their own cells with sizes specified in the MapDimensions module script.</p>
+
+    <code>
+        local MapDimensions = {
+            MapRadius = 1024,
+            SectorSize = 64,
+            CellSize = 4
+        }
+
+        return MapDimensions
+    </code>
+
+    <figure>
+        <img src="img/mapgen1.png">
+        <figcaption>Map division into 64x64 unit sectors. Each sector gets assigned its own ID.</figcaption>
+    </figure>
+    <figure>
+        <img src="img/mapgen2.png">
+        <figcaption>Division of sector into 4x4 unit cells.</figcaption>
+    </figure>
+</div>
+<div class="infobox" data-title="Cost Field">
+    <h1>Cost Field</h1>
+    <p>Based on terrain data and placed obstacles, the script generates a grid of cost values which helps guide units to lower cost paths in future steps.</p>
+</div>
+<div class="infobox" data-title="Portal Generation">
+    <h1>Portal Generation</h1>
+    <p>Portals are generated at the edges of each sector such that all sectors are connected to adjacent ones (wherever possible). Based on the portal positions, a graph is created using the portals as nodes and the distances between portals as edges.</p>
+</div>
+<div class="infobox" data-title="Approximate Path Calculation">
+    <h1>Approximate Path Calculation</h1>
+    <p>The script traverses the previously generated graph using A* to establish the general path in which a unit should go.</p>
+</div>
+<div class="infobox" data-title="Integration Field">
+    <h1>Integration Field</h1>
+    <p>Using the approximate path and previously calculated cost fields, the script runs a flood fill algorithm on every sector in the path such that integrated cost values grow outwards starting from a given target position.</p>
+</div>
+<div class="infobox" data-title="Flow Field">
+    <h1>Flow Field</h1>
+    <p>Based on the previously calculated integration fields, the script goes through each cell of the path's sectors and uses the minimum value of the adjacent cells to establish the direction in which a unit should go.</p>
+</div>
+
+<script>
+    var boxes = document.getElementsByClassName("infobox");
+    var selectedBox;
+    for(i = 0; i < boxes.length; i++) {
+        if(boxes[i].dataset.title === "Map Partitioning") {
+            boxes[i].style.display = "block";
+            selectedBox = boxes[i];
+        }
+        else {
+            boxes[i].style.display = "none";
+        }
+    }
+
+    function changePage(element) {
+        var box = document.querySelector('[data-title="' + element.text + '"]');
+        selectedBox.style.display = "none";
+        box.style.display = "block";
+        selectedBox = box;
+    }
+</script>
+
+</body>
 </html>
 
