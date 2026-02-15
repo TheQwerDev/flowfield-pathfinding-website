@@ -144,8 +144,7 @@
     text-align: center;
 }
 
-.vid-container video
-{
+.vid-container video {
     display: block;
     width: 100%;
     height: 100%;
