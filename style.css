@@ -144,25 +144,6 @@
     text-align: center;
 }
 
-/*.codebox {*/
-/*    border:solid gray;*/
-/*    border-width:.1em .1em .1em .8em;*/
-/*    padding:.2em .6em;*/
-/*}*/
-
-/*code {*/
-/*    font: 14px Consolas,monospace;*/
-/*    color: white;*/
-/*    border-radius: 3px;*/
-/*    background-clip: padding-box;*/
-/*    border: 1px solid #ccc;*/
-/*    background-color: #222222;*/
-/*    padding: 10px 10px;*/
-/*    display: block;*/
-/*    white-space: pre-wrap;*/
-/*    margin: 0;*/
-/*}*/
-
 body {
     background-image: url("img/tilebg.png");
     background-size: 237px 228px;
