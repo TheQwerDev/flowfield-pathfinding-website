@@ -7,57 +7,465 @@
 </head>
 
 <div class="topimg">
-    <img src="img/topimg.png">
     <div class="imgcorner-text">Flowfield Pathfinding</div>
 </div>
 
 <div class="topnav">
-    <a href="#">Introduction</a>
+    <a onclick="changePage(this)">Introduction</a>
     <div class="dropdown">
         <button class="dropdown-btn">Steps</button>
         <div class="dropdown-content">
-            <a href="#" onclick="changePage(this)">Map Partitioning</a>
-            <a href="#" onclick="changePage(this)">Cost Field</a>
-            <a href="#" onclick="changePage(this)">Portal Generation</a>
-            <a href="#" onclick="changePage(this)">Approximate Path Calculation</a>
-            <a href="#" onclick="changePage(this)">Integration Field</a>
-            <a href="#" onclick="changePage(this)">Flow Field</a>
+            <a onclick="changePage(this)">Map Partitioning</a>
+            <a onclick="changePage(this)">Cost Field</a>
+            <a onclick="changePage(this)">Portal Generation</a>
+            <a onclick="changePage(this)">Approximate Path Calculation</a>
+            <a onclick="changePage(this)">Integration Field</a>
+            <a onclick="changePage(this)">Flow Field</a>
         </div>
     </div>
-    <a href="#">Bibliography</a>
-    <a href="#">About</a>
+    <a>References</a>
+    <a>About</a>
+</div>
+
+<div class="infobox" data-title="Introduction">
+    <h1>Introduction</h1>
+    <p>Crowd pathfinding and steering using flow field tiles is a technique that solves the computational
+        problem of moving hundreds to thousands of individual agents across massive
+        maps. Through the use of dynamic flow field tiles, a more modern steering pipeline can be
+        achieved with features such as obstacle avoidance, flocking, dynamic formations, crowd
+        behavior, and support for arbitrary physics forces, all without the heavy CPU burden of
+        repeatedly rebuilding individual paths for each agent.</p>
+
+    <div class="fig-container" style="text-align: center">
+        <figure>
+            <img src="img/144littleguys.png" alt="" style="max-height: 600px">
+            <figcaption>144 agents travelling towards the center of a maze.</figcaption>
+        </figure>
+    </div>
+
+    <div class="vid-container" style="text-align: center">
+        <video width="1280" height="720" controls style="align-content: center">
+            <source src="video/example.mp4" type="video/mp4">
+            Your browser does not support the video tag.
+        </video>
+    </div>
+
+    <p>The purpose of this website is to showcase sections from an implementation of the flowfield pathfinding
+    algorithm in Roblox Studio using the Lua programming language.</p>
 </div>
 
 <div class="infobox" data-title="Map Partitioning">
     <h1>Map Partitioning</h1>
-    <p>The map is divided into sectors, each with their own cells with sizes specified in the MapDimensions module script.</p>
+    <p>
+        To be able to efficiently calculate the path from a source position to a target, the map is divided into sectors
+        and then further divided into cells which will hold the data required to query the direction in which an agent should travel.
+    </p>
 
-    <code>
-        local MapDimensions = {
-            MapRadius = 1024,
-            SectorSize = 64,
-            CellSize = 4
-        }
+    <div class="fig-container" style="text-align: center">
+        <figure>
+            <img src="img/mapgen1.png" alt="">
+            <figcaption>Map division into 64x64 unit sectors. Each sector gets assigned its own ID.</figcaption>
+        </figure>
+        <figure>
+            <img src="img/mapgen2.png" alt="">
+            <figcaption>Division of sector into 4x4 unit cells.</figcaption>
+        </figure>
+    </div>
 
-        return MapDimensions
-    </code>
-
-    <figure>
-        <img src="img/mapgen1.png">
-        <figcaption>Map division into 64x64 unit sectors. Each sector gets assigned its own ID.</figcaption>
-    </figure>
-    <figure>
-        <img src="img/mapgen2.png">
-        <figcaption>Division of sector into 4x4 unit cells.</figcaption>
-    </figure>
+    <p>
+        In my case, I'm using a sector size of 64x64 ingame units which hold cells of size 4x4. This offers a decent balance
+        between pathfinding accuracy and performance.
+    </p>
 </div>
+
 <div class="infobox" data-title="Cost Field">
     <h1>Cost Field</h1>
-    <p>Based on terrain data and placed obstacles, the script generates a grid of cost values which helps guide units to lower cost paths in future steps.</p>
+    <p>
+        The cost field contains information about how difficult a certain portion of the terrain is to traverse.
+        Each cell gets assigned a value from 1 to 255 based on the slope of the terrain at the cell's position.
+        The cost is weighted using a cubic function to lessen the impact that small slopes have on path calculation
+        and to make steep slopes harder to traverse.
+        If there's an obstacle inside of the cell, the cost value for that cell gets set to 255, marking it as impassable.
+    </p>
+
+    <div class="fig-container" style="text-align: center">
+        <figure>
+            <img src="img/costexample1.png" alt="">
+            <figcaption>An example of how cost is assigned to slopes.
+                Notice how the cell colors change based on the angle of the slopes to reflect the higher cost of traversing them.</figcaption>
+        </figure>
+        <figure>
+            <img src="img/costexample2.png" alt="">
+            <figcaption>The game considers both the house and the wall as obstacles and assigns them the maximum cost of 255.</figcaption>
+        </figure>
+    </div>
+
+    <p>The implementation for the cost field calculation is as follows:</p>
+
+    <!-- HTML generated using hilite.me --><div style="background: #f8f8f8; overflow:auto;width:auto;border:solid gray;border-width:.1em .1em .1em .8em;padding:.2em .6em;"><pre style="margin: 0; line-height: 125%;"><span></span><span style="color: #008000; font-weight: bold">function</span><span style="color: #BBB"> </span><span style="color: #00F; font-weight: bold">SectorInfo</span>:<span style="color: #00F">CalculateCostField</span>(<span style="color: #19177C">obstacleParams</span>:<span style="color: #BBB"> </span>RaycastParams,<span style="color: #BBB"> </span><span style="color: #19177C">terrainParams</span>:<span style="color: #BBB"> </span>RaycastParams)
+    <span style="color: #BBB">	</span><span style="color: #008000; font-weight: bold">local</span><span style="color: #BBB"> </span><span style="color: #19177C">eps</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #666">0.05</span>
+
+    <span style="color: #BBB">	</span><span style="color: #008000; font-weight: bold">for</span><span style="color: #BBB"> </span><span style="color: #19177C">i</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #666">1</span>,<span style="color: #BBB"> </span><span style="color: #19177C">cellCount</span><span style="color: #BBB"> </span><span style="color: #008000; font-weight: bold">do</span>
+    <span style="color: #BBB">		</span><span style="color: #008000; font-weight: bold">if</span><span style="color: #BBB"> </span><span style="color: #19177C">self</span>.Heightmap[<span style="color: #19177C">i</span>]<span style="color: #BBB"> </span><span style="color: #666">==</span><span style="color: #BBB"> </span><span style="color: #008000; font-weight: bold">nil</span><span style="color: #BBB"> </span><span style="color: #008000; font-weight: bold">then</span>
+    <span style="color: #BBB">			</span><span style="color: #19177C">self</span>.Heightmap[<span style="color: #19177C">i</span>]<span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span>{}
+    <span style="color: #BBB">		</span><span style="color: #008000; font-weight: bold">end</span>
+
+    <span style="color: #BBB">		</span><span style="color: #008000; font-weight: bold">if</span><span style="color: #BBB"> </span><span style="color: #19177C">self</span>.CostField[<span style="color: #19177C">i</span>]<span style="color: #BBB"> </span><span style="color: #666">==</span><span style="color: #BBB"> </span><span style="color: #008000; font-weight: bold">nil</span><span style="color: #BBB"> </span><span style="color: #008000; font-weight: bold">then</span>
+    <span style="color: #BBB">			</span><span style="color: #19177C">self</span>.CostField[<span style="color: #19177C">i</span>]<span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span>{}
+    <span style="color: #BBB">		</span><span style="color: #008000; font-weight: bold">end</span>
+
+    <span style="color: #BBB">		</span><span style="color: #008000; font-weight: bold">for</span><span style="color: #BBB"> </span><span style="color: #19177C">j</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #666">1</span>,<span style="color: #BBB"> </span><span style="color: #19177C">cellCount</span><span style="color: #BBB"> </span><span style="color: #008000; font-weight: bold">do</span>
+    <span style="color: #BBB">			</span><span style="color: #19177C">self</span>.Heightmap[<span style="color: #19177C">i</span>][<span style="color: #19177C">j</span>]<span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #666">0</span>
+
+    <span style="color: #BBB">			</span><span style="color: #008000; font-weight: bold">local</span><span style="color: #BBB"> </span><span style="color: #19177C">cellCenter</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">Vector3</span>.<span style="color: #00F">new</span>(<span style="color: #19177C">i</span><span style="color: #BBB"> </span><span style="color: #666">-</span><span style="color: #BBB"> </span><span style="color: #666">1</span>,<span style="color: #BBB"> </span><span style="color: #666">0</span>,<span style="color: #BBB"> </span><span style="color: #19177C">j</span><span style="color: #BBB"> </span><span style="color: #666">-</span><span style="color: #BBB"> </span><span style="color: #666">1</span>)<span style="color: #BBB"> </span><span style="color: #666">*</span><span style="color: #BBB"> </span><span style="color: #19177C">cellSize</span><span style="color: #BBB"> </span><span style="color: #666">+</span><span style="color: #BBB"> </span><span style="color: #19177C">Vector3</span>.<span style="color: #00F">new</span>(<span style="color: #19177C">self</span>.Position.X,<span style="color: #BBB"> </span><span style="color: #666">0</span>,<span style="color: #BBB"> </span><span style="color: #19177C">self</span>.Position.Y)<span style="color: #BBB"> </span><span style="color: #666">*</span><span style="color: #BBB"> </span><span style="color: #19177C">sectorSize</span><span style="color: #BBB"> </span><span style="color: #666">+</span><span style="color: #BBB"> </span><span style="color: #19177C">Vector3</span>.<span style="color: #00F">new</span>(<span style="color: #19177C">cellSize</span>,<span style="color: #BBB"> </span><span style="color: #666">0</span>,<span style="color: #BBB"> </span><span style="color: #19177C">cellSize</span>)<span style="color: #BBB"> </span><span style="color: #666">/</span><span style="color: #BBB"> </span><span style="color: #666">2</span>
+    <span style="color: #BBB">			</span>
+    <span style="color: #BBB">			</span><span style="color: #008000; font-weight: bold">local</span><span style="color: #BBB"> </span><span style="color: #19177C">obstacles</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">workspace</span>:<span style="color: #00F">Spherecast</span>(
+    <span style="color: #BBB">				</span><span style="color: #19177C">cellCenter</span><span style="color: #BBB"> </span><span style="color: #666">-</span><span style="color: #BBB"> </span><span style="color: #19177C">Vector3</span>.yAxis<span style="color: #BBB"> </span><span style="color: #666">*</span><span style="color: #BBB"> </span><span style="color: #666">128</span>,
+    <span style="color: #BBB">				</span><span style="color: #19177C">cellSize</span><span style="color: #BBB"> </span><span style="color: #666">/</span><span style="color: #BBB"> </span><span style="color: #666">2</span><span style="color: #BBB"> </span><span style="color: #666">-</span><span style="color: #BBB"> </span><span style="color: #19177C">eps</span>,<span style="color: #BBB"> </span>
+    <span style="color: #BBB">				</span><span style="color: #19177C">Vector3</span>.<span style="color: #00F">new</span>(<span style="color: #666">0</span>,<span style="color: #BBB"> </span><span style="color: #666">512</span>,<span style="color: #BBB"> </span><span style="color: #666">0</span>),
+    <span style="color: #BBB">				</span><span style="color: #19177C">obstacleParams</span>
+    <span style="color: #BBB">			</span>)
+    <span style="color: #BBB">			</span>
+    <span style="color: #BBB">			</span><span style="color: #008000; font-weight: bold">if</span><span style="color: #BBB"> </span><span style="color: #19177C">obstacles</span><span style="color: #BBB"> </span><span style="color: #666">~=</span><span style="color: #BBB"> </span><span style="color: #008000; font-weight: bold">nil</span><span style="color: #BBB"> </span><span style="color: #008000; font-weight: bold">then</span>
+    <span style="color: #BBB">				</span><span style="color: #19177C">self</span>.CostField[<span style="color: #19177C">i</span>][<span style="color: #19177C">j</span>]<span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">SectorInfo</span>.MaxCost
+    <span style="color: #BBB">			</span><span style="color: #008000; font-weight: bold">else</span>
+    <span style="color: #BBB">				</span><span style="color: #19177C">self</span>.CostField[<span style="color: #19177C">i</span>][<span style="color: #19177C">j</span>]<span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #666">1</span>
+    <span style="color: #BBB">			</span><span style="color: #008000; font-weight: bold">end</span>
+
+    <span style="color: #BBB">			</span><span style="color: #008000; font-weight: bold">local</span><span style="color: #BBB"> </span><span style="color: #19177C">ray</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">workspace</span>:<span style="color: #00F">Raycast</span>(<span style="color: #19177C">cellCenter</span><span style="color: #BBB"> </span><span style="color: #666">+</span><span style="color: #BBB"> </span><span style="color: #19177C">Vector3</span>.yAxis<span style="color: #BBB"> </span><span style="color: #666">*</span><span style="color: #BBB"> </span><span style="color: #666">512</span>,<span style="color: #BBB"> </span><span style="color: #666">-</span><span style="color: #19177C">Vector3</span>.yAxis<span style="color: #BBB"> </span><span style="color: #666">*</span><span style="color: #BBB"> </span><span style="color: #666">1024</span>,<span style="color: #BBB"> </span><span style="color: #19177C">terrainParams</span>)
+
+    <span style="color: #BBB">			</span><span style="color: #008000; font-weight: bold">if</span><span style="color: #BBB"> </span><span style="color: #19177C">ray</span><span style="color: #BBB"> </span><span style="color: #666">==</span><span style="color: #BBB"> </span><span style="color: #008000; font-weight: bold">nil</span><span style="color: #BBB"> </span><span style="color: #008000; font-weight: bold">then</span>
+    <span style="color: #BBB">				</span><span style="color: #19177C">continue</span>
+    <span style="color: #BBB">			</span><span style="color: #008000; font-weight: bold">end</span>
+
+    <span style="color: #BBB">			</span><span style="color: #19177C">self</span>.Heightmap[<span style="color: #19177C">i</span>][<span style="color: #19177C">j</span>]<span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">ray</span>.Position.Y
+
+    <span style="color: #BBB">			</span><span style="color: #008000; font-weight: bold">if</span><span style="color: #BBB"> </span><span style="color: #19177C">self</span>.CostField[<span style="color: #19177C">i</span>][<span style="color: #19177C">j</span>]<span style="color: #BBB"> </span><span style="color: #666">==</span><span style="color: #BBB"> </span><span style="color: #19177C">SectorInfo</span>.MaxCost<span style="color: #BBB"> </span><span style="color: #008000; font-weight: bold">then</span>
+    <span style="color: #BBB">				</span><span style="color: #19177C">continue</span>
+    <span style="color: #BBB">			</span><span style="color: #008000; font-weight: bold">end</span>
+
+    <span style="color: #BBB">			</span><span style="color: #008000; font-weight: bold">local</span><span style="color: #BBB"> </span><span style="color: #19177C">terrainObj</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">ray</span>.Instance
+    <span style="color: #BBB">			</span><span style="color: #008000; font-weight: bold">local</span><span style="color: #BBB"> </span><span style="color: #19177C">x</span>,<span style="color: #BBB"> </span><span style="color: #19177C">y</span>,<span style="color: #BBB"> </span><span style="color: #19177C">z</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">terrainObj</span>.Size.X,<span style="color: #BBB"> </span><span style="color: #19177C">terrainObj</span>.Size.Y,<span style="color: #BBB"> </span><span style="color: #19177C">terrainObj</span>.Size.Z
+    <span style="color: #BBB">			</span><span style="color: #008000; font-weight: bold">local</span><span style="color: #BBB"> </span><span style="color: #19177C">slopeLen</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #008000; font-weight: bold">nil</span>
+    <span style="color: #BBB">			</span><span style="color: #008000; font-weight: bold">if</span><span style="color: #BBB"> </span><span style="color: #19177C">terrainObj</span>:<span style="color: #00F">IsA</span>(<span style="color: #BA2121">&quot;WedgePart&quot;</span>)<span style="color: #BBB"> </span><span style="color: #A2F; font-weight: bold">or</span><span style="color: #BBB"> </span>(<span style="color: #19177C">terrainObj</span>:<span style="color: #00F">IsA</span>(<span style="color: #BA2121">&quot;Part&quot;</span>)<span style="color: #BBB"> </span><span style="color: #A2F; font-weight: bold">and</span><span style="color: #BBB"> </span><span style="color: #19177C">terrainObj</span>.Shape<span style="color: #BBB"> </span><span style="color: #666">==</span><span style="color: #BBB"> </span><span style="color: #19177C">Enum</span>.PartType.Wedge)<span style="color: #BBB"> </span><span style="color: #008000; font-weight: bold">then</span>
+    <span style="color: #BBB">				</span><span style="color: #19177C">slopeLen</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #008000">math.sqrt</span>(<span style="color: #19177C">y</span><span style="color: #BBB"> </span><span style="color: #666">*</span><span style="color: #BBB"> </span><span style="color: #19177C">y</span><span style="color: #BBB"> </span><span style="color: #666">+</span><span style="color: #BBB"> </span><span style="color: #19177C">z</span><span style="color: #BBB"> </span><span style="color: #666">*</span><span style="color: #BBB"> </span><span style="color: #19177C">z</span>)
+    <span style="color: #BBB">			</span><span style="color: #008000; font-weight: bold">elseif</span><span style="color: #BBB"> </span><span style="color: #19177C">terrainObj</span>:<span style="color: #00F">IsA</span>(<span style="color: #BA2121">&quot;CornerWedgePart&quot;</span>)<span style="color: #BBB"> </span><span style="color: #A2F; font-weight: bold">or</span><span style="color: #BBB"> </span>(<span style="color: #19177C">terrainObj</span>:<span style="color: #00F">IsA</span>(<span style="color: #BA2121">&quot;Part&quot;</span>)<span style="color: #BBB"> </span><span style="color: #A2F; font-weight: bold">and</span><span style="color: #BBB"> </span><span style="color: #19177C">terrainObj</span>.Shape<span style="color: #BBB"> </span><span style="color: #666">==</span><span style="color: #BBB"> </span><span style="color: #19177C">Enum</span>.PartType.CornerWedge)<span style="color: #BBB"> </span><span style="color: #008000; font-weight: bold">then</span>
+    <span style="color: #BBB">				</span><span style="color: #008000; font-weight: bold">local</span><span style="color: #BBB"> </span><span style="color: #19177C">baseLen</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #008000">math.max</span>(<span style="color: #19177C">x</span>,<span style="color: #BBB"> </span><span style="color: #19177C">z</span>)
+    <span style="color: #BBB">				</span><span style="color: #19177C">slopeLen</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #008000">math.sqrt</span>(<span style="color: #19177C">y</span><span style="color: #BBB"> </span><span style="color: #666">*</span><span style="color: #BBB"> </span><span style="color: #19177C">y</span><span style="color: #BBB"> </span><span style="color: #666">+</span><span style="color: #BBB"> </span><span style="color: #19177C">baseLen</span><span style="color: #BBB"> </span><span style="color: #666">*</span><span style="color: #BBB"> </span><span style="color: #19177C">baseLen</span>)
+    <span style="color: #BBB">			</span><span style="color: #008000; font-weight: bold">end</span>
+
+    <span style="color: #BBB">			</span><span style="color: #008000; font-weight: bold">if</span><span style="color: #BBB"> </span><span style="color: #19177C">slopeLen</span><span style="color: #BBB"> </span><span style="color: #666">==</span><span style="color: #BBB"> </span><span style="color: #008000; font-weight: bold">nil</span><span style="color: #BBB"> </span><span style="color: #008000; font-weight: bold">then</span>
+    <span style="color: #BBB">				</span><span style="color: #19177C">continue</span>
+    <span style="color: #BBB">			</span><span style="color: #008000; font-weight: bold">end</span>
+
+    <span style="color: #BBB">			</span><span style="color: #008000; font-weight: bold">local</span><span style="color: #BBB"> </span><span style="color: #19177C">slopeSine</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">y</span><span style="color: #BBB"> </span><span style="color: #666">/</span><span style="color: #BBB"> </span><span style="color: #19177C">slopeLen</span>
+    <span style="color: #BBB">			</span><span style="color: #008000; font-weight: bold">local</span><span style="color: #BBB"> </span><span style="color: #19177C">t</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">slopeSine</span><span style="color: #BBB"> </span><span style="color: #666">*</span><span style="color: #BBB"> </span><span style="color: #666">2</span><span style="color: #BBB"> </span><span style="color: #666">/</span><span style="color: #BBB"> </span><span style="color: #008000">math.pi</span>
+    <span style="color: #BBB">			</span><span style="color: #008000; font-weight: bold">local</span><span style="color: #BBB"> </span><span style="color: #19177C">slopeCost</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">math</span>.<span style="color: #00F">round</span>(<span style="color: #19177C">SectorInfo</span>.MaxCost<span style="color: #BBB"> </span><span style="color: #666">*</span><span style="color: #BBB"> </span><span style="color: #666">3</span><span style="color: #BBB"> </span><span style="color: #666">*</span><span style="color: #BBB"> </span>(<span style="color: #666">1</span><span style="color: #BBB"> </span><span style="color: #666">-</span><span style="color: #BBB"> </span><span style="color: #19177C">t</span>)<span style="color: #BBB"> </span><span style="color: #666">*</span><span style="color: #BBB"> </span><span style="color: #19177C">t</span><span style="color: #BBB"> </span><span style="color: #666">*</span><span style="color: #BBB"> </span><span style="color: #19177C">t</span><span style="color: #BBB"> </span><span style="color: #666">+</span><span style="color: #BBB"> </span><span style="color: #19177C">t</span><span style="color: #BBB"> </span><span style="color: #666">*</span><span style="color: #BBB"> </span><span style="color: #19177C">t</span><span style="color: #BBB"> </span><span style="color: #666">*</span><span style="color: #BBB"> </span><span style="color: #19177C">t</span>)
+    <span style="color: #BBB">			</span><span style="color: #19177C">self</span>.CostField[<span style="color: #19177C">i</span>][<span style="color: #19177C">j</span>]<span style="color: #BBB"> </span><span style="color: #666">+=</span><span style="color: #BBB"> </span><span style="color: #19177C">slopeCost</span>
+    <span style="color: #BBB">			</span><span style="color: #19177C">self</span>.CostField[<span style="color: #19177C">i</span>][<span style="color: #19177C">j</span>]<span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #008000">math.floor</span>(<span style="color: #19177C">self</span>.CostField[<span style="color: #19177C">i</span>][<span style="color: #19177C">j</span>])
+    <span style="color: #BBB">		</span><span style="color: #008000; font-weight: bold">end</span>
+    <span style="color: #BBB">	</span><span style="color: #008000; font-weight: bold">end</span>
+    <span style="color: #008000; font-weight: bold">end</span>
+    </pre></div>
+
+    <p>The documentation for the casting functions implemented by the game engine can be found below:</p>
+    <ul>
+        <li><a href="https://create.roblox.com/docs/reference/engine/classes/WorldRoot#Spherecast">WorldRoot:Spherecast</a></li>
+        <li><a href="https://create.roblox.com/docs/reference/engine/classes/WorldRoot#Raycast">WorldRoot:Raycast</a></li>
+    </ul>
+
+    <p>The cost calculation function is called inside of a function that initializes all cost fields.</p>
+
+    <!-- HTML generated using hilite.me --><div style="background: #f8f8f8; overflow:auto;width:auto;border:solid gray;border-width:.1em .1em .1em .8em;padding:.2em .6em;"><pre style="margin: 0; line-height: 125%;"><span></span><span style="color: #008000; font-weight: bold">local</span><span style="color: #BBB"> </span><span style="color: #008000; font-weight: bold">function</span><span style="color: #BBB"> </span><span style="color: #00F">InitializeCostField</span>()
+    <span style="color: #BBB">	</span><span style="color: #19177C">debug</span>.<span style="color: #00F">profilebegin</span>(<span style="color: #BA2121">&quot;Cost Field Initialization&quot;</span>)
+    <span style="color: #BBB">	</span><span style="color: #008000; font-weight: bold">for</span><span style="color: #BBB"> </span><span style="color: #19177C">i</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #666">-</span><span style="color: #19177C">sectorCount</span>,<span style="color: #BBB"> </span><span style="color: #19177C">sectorCount</span><span style="color: #BBB"> </span><span style="color: #666">-</span><span style="color: #BBB"> </span><span style="color: #666">1</span><span style="color: #BBB"> </span><span style="color: #008000; font-weight: bold">do</span>
+    <span style="color: #BBB">		</span><span style="color: #19177C">sectorGrid</span>[<span style="color: #19177C">i</span>]<span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span>{}
+    <span style="color: #BBB">		</span><span style="color: #19177C">debugChunk</span>[<span style="color: #19177C">i</span>]<span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span>{}
+    <span style="color: #BBB">		</span><span style="color: #008000; font-weight: bold">for</span><span style="color: #BBB"> </span><span style="color: #19177C">j</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #666">-</span><span style="color: #19177C">sectorCount</span>,<span style="color: #BBB"> </span><span style="color: #19177C">sectorCount</span><span style="color: #BBB"> </span><span style="color: #666">-</span><span style="color: #BBB"> </span><span style="color: #666">1</span><span style="color: #BBB"> </span><span style="color: #008000; font-weight: bold">do</span><span style="color: #BBB">		</span>
+    <span style="color: #BBB">			</span><span style="color: #008000; font-weight: bold">local</span><span style="color: #BBB"> </span><span style="color: #19177C">sectorPos</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">Vector2</span>.<span style="color: #00F">new</span>(<span style="color: #19177C">i</span>,<span style="color: #BBB"> </span><span style="color: #19177C">j</span>)
+
+    <span style="color: #BBB">			</span><span style="color: #19177C">debugChunk</span>[<span style="color: #19177C">i</span>][<span style="color: #19177C">j</span>]<span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">DebugChunk</span>.<span style="color: #00F">new</span>()
+    <span style="color: #BBB">			</span><span style="color: #008000; font-weight: bold">local</span><span style="color: #BBB"> </span><span style="color: #19177C">chunk</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">debugChunk</span>[<span style="color: #19177C">i</span>][<span style="color: #19177C">j</span>]
+
+    <span style="color: #BBB">			</span><span style="color: #00F">DebugInsertProperties</span>(<span style="color: #19177C">chunk</span>.Display[<span style="color: #19177C">DebugEnums</span>.DebugDisplayMode.Sector],<span style="color: #BBB"> </span>{
+    <span style="color: #BBB">				</span><span style="color: #19177C">Type</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">DebugEnums</span>.DebugObject.Plane,
+    <span style="color: #BBB">				</span><span style="color: #19177C">SectorPosition</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">sectorPos</span>,
+    <span style="color: #BBB">				</span><span style="color: #19177C">Position</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #00F">DebugGetSectorCenter</span>(<span style="color: #19177C">sectorPos</span>),
+    <span style="color: #BBB">				</span><span style="color: #19177C">Size</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">sectorSize</span>,
+    <span style="color: #BBB">				</span><span style="color: #19177C">Color</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">DebugSectorPlaneColor</span>
+    <span style="color: #BBB">			</span>})
+
+    <span style="color: #BBB">			</span><span style="color: #00F">DebugInsertProperties</span>(<span style="color: #19177C">chunk</span>.Display[<span style="color: #19177C">DebugEnums</span>.DebugDisplayMode.Sector],<span style="color: #BBB"> </span>{
+    <span style="color: #BBB">				</span><span style="color: #19177C">Type</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">DebugEnums</span>.DebugObject.Text,
+    <span style="color: #BBB">				</span><span style="color: #19177C">SectorPosition</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">sectorPos</span>,
+    <span style="color: #BBB">				</span><span style="color: #19177C">Position</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #00F">DebugGetSectorCenter</span>(<span style="color: #19177C">sectorPos</span>),<span style="color: #BBB"> </span>
+    <span style="color: #BBB">				</span><span style="color: #19177C">Text</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #BA2121">&quot;[&quot;</span><span style="color: #666">..</span><span style="color: #19177C">i</span><span style="color: #666">..</span><span style="color: #BA2121">&quot;|&quot;</span><span style="color: #666">..</span><span style="color: #19177C">j</span><span style="color: #666">..</span><span style="color: #BA2121">&quot;] &quot;</span><span style="color: #666">..</span><span style="color: #19177C">Utils</span>.<span style="color: #00F">ConvertSectorPosToNumber</span>(<span style="color: #19177C">sectorPos</span>),
+    <span style="color: #BBB">				</span><span style="color: #19177C">FontSize</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #666">24</span>,
+    <span style="color: #BBB">				</span><span style="color: #19177C">Color</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">DebugSectorPlaneColor</span>
+    <span style="color: #BBB">			</span>})
+
+    <span style="color: #BBB">			</span><span style="color: #19177C">sectorGrid</span>[<span style="color: #19177C">i</span>][<span style="color: #19177C">j</span>]<span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">SectorInfo</span>.<span style="color: #00F">new</span>(<span style="color: #19177C">sectorPos</span>)
+    <span style="color: #BBB">			</span><span style="color: #19177C">sectorGrid</span>[<span style="color: #19177C">i</span>][<span style="color: #19177C">j</span>]:<span style="color: #00F">CalculateCostField</span>(<span style="color: #19177C">obstacleParams</span>,<span style="color: #BBB"> </span><span style="color: #19177C">terrainParams</span>)
+    <span style="color: #BBB">		</span><span style="color: #008000; font-weight: bold">end</span>
+    <span style="color: #BBB">	</span><span style="color: #008000; font-weight: bold">end</span>
+
+    <span style="color: #BBB">	</span><span style="color: #008000; font-weight: bold">for</span><span style="color: #BBB"> </span><span style="color: #19177C">i</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #666">-</span><span style="color: #19177C">sectorCount</span>,<span style="color: #BBB"> </span><span style="color: #19177C">sectorCount</span><span style="color: #BBB"> </span><span style="color: #666">-</span><span style="color: #BBB"> </span><span style="color: #666">1</span><span style="color: #BBB"> </span><span style="color: #008000; font-weight: bold">do</span>
+    <span style="color: #BBB">		</span><span style="color: #008000; font-weight: bold">for</span><span style="color: #BBB"> </span><span style="color: #19177C">j</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #666">-</span><span style="color: #19177C">sectorCount</span>,<span style="color: #BBB"> </span><span style="color: #19177C">sectorCount</span><span style="color: #BBB"> </span><span style="color: #666">-</span><span style="color: #BBB"> </span><span style="color: #666">1</span><span style="color: #BBB"> </span><span style="color: #008000; font-weight: bold">do</span>
+    <span style="color: #BBB">			</span><span style="color: #008000; font-weight: bold">local</span><span style="color: #BBB"> </span><span style="color: #19177C">sectorPos</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">Vector2</span>.<span style="color: #00F">new</span>(<span style="color: #19177C">i</span>,<span style="color: #BBB"> </span><span style="color: #19177C">j</span>)
+    <span style="color: #BBB">			</span><span style="color: #008000; font-weight: bold">if</span><span style="color: #BBB"> </span>(<span style="color: #19177C">i</span><span style="color: #BBB"> </span><span style="color: #666">+</span><span style="color: #BBB"> </span><span style="color: #19177C">j</span><span style="color: #BBB"> </span><span style="color: #666">+</span><span style="color: #BBB"> </span><span style="color: #666">2</span><span style="color: #BBB"> </span><span style="color: #666">*</span><span style="color: #BBB"> </span><span style="color: #19177C">sectorCount</span>)<span style="color: #BBB"> </span><span style="color: #666">%</span><span style="color: #BBB"> </span><span style="color: #666">2</span><span style="color: #BBB"> </span><span style="color: #666">==</span><span style="color: #BBB"> </span><span style="color: #666">0</span><span style="color: #BBB"> </span><span style="color: #008000; font-weight: bold">then</span>
+    <span style="color: #BBB">				</span><span style="color: #3D7B7B; font-style: italic">--setup portals at every even sum of chunk coords</span>
+    <span style="color: #BBB">				</span><span style="color: #3D7B7B; font-style: italic">--since we also generate portals at the neighbor edges</span>
+    <span style="color: #BBB">				</span><span style="color: #3D7B7B; font-style: italic">--that are adjacent to the current sector position</span>
+    <span style="color: #BBB">				</span><span style="color: #00F">GeneratePortals</span>(<span style="color: #19177C">sectorPos</span>)
+    <span style="color: #BBB">			</span><span style="color: #008000; font-weight: bold">end</span>
+    <span style="color: #BBB">		</span><span style="color: #008000; font-weight: bold">end</span>
+    <span style="color: #BBB">	</span><span style="color: #008000; font-weight: bold">end</span>
+
+    <span style="color: #BBB">	</span><span style="color: #008000; font-weight: bold">for</span><span style="color: #BBB"> </span><span style="color: #19177C">i</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #666">-</span><span style="color: #19177C">sectorCount</span>,<span style="color: #BBB"> </span><span style="color: #19177C">sectorCount</span><span style="color: #BBB"> </span><span style="color: #666">-</span><span style="color: #BBB"> </span><span style="color: #666">1</span><span style="color: #BBB"> </span><span style="color: #008000; font-weight: bold">do</span>
+    <span style="color: #BBB">		</span><span style="color: #008000; font-weight: bold">for</span><span style="color: #BBB"> </span><span style="color: #19177C">j</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #666">-</span><span style="color: #19177C">sectorCount</span>,<span style="color: #BBB"> </span><span style="color: #19177C">sectorCount</span><span style="color: #BBB"> </span><span style="color: #666">-</span><span style="color: #BBB"> </span><span style="color: #666">1</span><span style="color: #BBB"> </span><span style="color: #008000; font-weight: bold">do</span>
+    <span style="color: #BBB">			</span><span style="color: #008000; font-weight: bold">local</span><span style="color: #BBB"> </span><span style="color: #19177C">sectorPos</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">Vector2</span>.<span style="color: #00F">new</span>(<span style="color: #19177C">i</span>,<span style="color: #BBB"> </span><span style="color: #19177C">j</span>)
+    <span style="color: #BBB">			</span><span style="color: #00F">DebugSetupSectorCostFieldDisplay</span>(<span style="color: #19177C">sectorPos</span>)
+    <span style="color: #BBB">			</span><span style="color: #00F">ConnectPortalsFlood</span>(<span style="color: #19177C">sectorPos</span>)
+    <span style="color: #BBB">		</span><span style="color: #008000; font-weight: bold">end</span>
+    <span style="color: #BBB">	</span><span style="color: #008000; font-weight: bold">end</span>
+    <span style="color: #BBB">	</span><span style="color: #19177C">debug</span>.<span style="color: #00F">profileend</span>()
+    <span style="color: #008000; font-weight: bold">end</span>
+    </pre></div>
 </div>
+
 <div class="infobox" data-title="Portal Generation">
     <h1>Portal Generation</h1>
-    <p>Portals are generated at the edges of each sector such that all sectors are connected to adjacent ones (wherever possible). Based on the portal positions, a graph is created using the portals as nodes and the distances between portals as edges.</p>
+    <p>A "portal" in the context of flowfield pathfinding represents a sector edge through which an agent can travel to an adjacent sector.
+    Portal positions are established using the previously generated cost field by calculating the midpoints between obstacles at the edges of sectors.</p>
+
+    <!-- HTML generated using hilite.me --><div style="background: #f8f8f8; overflow:auto;width:auto;border:solid gray;border-width:.1em .1em .1em .8em;padding:.2em .6em;"><pre style="margin: 0; line-height: 125%;"><span></span><span style="color: #008000; font-weight: bold">local</span><span style="color: #BBB"> </span><span style="color: #008000; font-weight: bold">function</span><span style="color: #BBB"> </span><span style="color: #00F">GeneratePortals</span>(<span style="color: #19177C">sectorPos</span>:<span style="color: #BBB"> </span>Vector2)
+    <span style="color: #BBB">	</span><span style="color: #19177C">debug</span>.<span style="color: #00F">profilebegin</span>(<span style="color: #BA2121">&quot;Portal Generation&quot;</span>)
+    <span style="color: #BBB">	</span><span style="color: #008000; font-weight: bold">local</span><span style="color: #BBB"> </span><span style="color: #19177C">sector</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">sectorGrid</span>[<span style="color: #19177C">sectorPos</span>.X][<span style="color: #19177C">sectorPos</span>.Y]
+    <span style="color: #BBB">	</span><span style="color: #19177C">sector</span>:<span style="color: #00F">ResetPortals</span>()
+
+    <span style="color: #BBB">	</span><span style="color: #008000; font-weight: bold">for</span><span style="color: #BBB"> </span><span style="color: #19177C">idx</span>,<span style="color: #BBB"> </span><span style="color: #19177C">dir</span><span style="color: #BBB"> </span><span style="color: #008000; font-weight: bold">in</span><span style="color: #BBB"> </span><span style="color: #19177C">dirs</span><span style="color: #BBB"> </span><span style="color: #008000; font-weight: bold">do</span>
+    <span style="color: #BBB">		</span><span style="color: #008000; font-weight: bold">local</span><span style="color: #BBB"> </span><span style="color: #19177C">adj</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">sectorPos</span><span style="color: #BBB"> </span><span style="color: #666">+</span><span style="color: #BBB"> </span><span style="color: #19177C">dir</span>
+    <span style="color: #BBB">		</span><span style="color: #008000; font-weight: bold">if</span><span style="color: #BBB"> </span><span style="color: #A2F; font-weight: bold">not</span><span style="color: #BBB"> </span><span style="color: #19177C">Utils</span>.<span style="color: #00F">IsValidSectorPos</span>(<span style="color: #19177C">adj</span>)<span style="color: #BBB"> </span><span style="color: #008000; font-weight: bold">then</span>
+    <span style="color: #BBB">			</span><span style="color: #19177C">continue</span>
+    <span style="color: #BBB">		</span><span style="color: #008000; font-weight: bold">end</span>
+
+    <span style="color: #BBB">		</span><span style="color: #008000; font-weight: bold">local</span><span style="color: #BBB"> </span><span style="color: #19177C">sectorAdj</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">sectorGrid</span>[<span style="color: #19177C">adj</span>.X][<span style="color: #19177C">adj</span>.Y]
+
+    <span style="color: #BBB">		</span><span style="color: #008000; font-weight: bold">local</span><span style="color: #BBB"> </span><span style="color: #19177C">sideId</span>,<span style="color: #BBB"> </span><span style="color: #19177C">sideIdAdj</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">idx</span><span style="color: #BBB"> </span><span style="color: #666">-</span><span style="color: #BBB"> </span><span style="color: #666">1</span>,<span style="color: #BBB"> </span>(<span style="color: #19177C">idx</span><span style="color: #BBB"> </span><span style="color: #666">+</span><span style="color: #BBB"> </span><span style="color: #666">1</span>)<span style="color: #BBB"> </span><span style="color: #666">%</span><span style="color: #BBB"> </span><span style="color: #666">4</span>
+    <span style="color: #BBB">		</span><span style="color: #008000; font-weight: bold">local</span><span style="color: #BBB"> </span><span style="color: #19177C">side</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">sector</span>:<span style="color: #00F">GetSideCosts</span>(<span style="color: #19177C">sideId</span>)
+    <span style="color: #BBB">		</span><span style="color: #008000; font-weight: bold">local</span><span style="color: #BBB"> </span><span style="color: #19177C">sideAdj</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">sectorAdj</span>:<span style="color: #00F">GetSideCosts</span>(<span style="color: #19177C">sideIdAdj</span>)
+
+    <span style="color: #BBB">		</span><span style="color: #19177C">sectorAdj</span>:<span style="color: #00F">ResetPortalSide</span>(<span style="color: #19177C">sideIdAdj</span>)
+
+    <span style="color: #BBB">		</span><span style="color: #008000; font-weight: bold">local</span><span style="color: #BBB"> </span><span style="color: #19177C">openPos</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #008000; font-weight: bold">nil</span>
+    <span style="color: #BBB">		</span><span style="color: #008000; font-weight: bold">if</span><span style="color: #BBB"> </span><span style="color: #19177C">side</span>[<span style="color: #666">1</span>]<span style="color: #BBB"> </span><span style="color: #666">~=</span><span style="color: #BBB"> </span><span style="color: #19177C">SectorInfo</span>.MaxCost<span style="color: #BBB"> </span><span style="color: #A2F; font-weight: bold">and</span><span style="color: #BBB"> </span><span style="color: #19177C">sideAdj</span>[<span style="color: #666">1</span>]<span style="color: #BBB"> </span><span style="color: #666">~=</span><span style="color: #BBB"> </span><span style="color: #19177C">SectorInfo</span>.MaxCost<span style="color: #BBB"> </span><span style="color: #008000; font-weight: bold">then</span>
+    <span style="color: #BBB">			</span><span style="color: #19177C">openPos</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #666">1</span>
+    <span style="color: #BBB">		</span><span style="color: #008000; font-weight: bold">end</span>
+
+    <span style="color: #BBB">		</span><span style="color: #008000; font-weight: bold">for</span><span style="color: #BBB"> </span><span style="color: #19177C">i</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #666">1</span>,<span style="color: #BBB"> </span><span style="color: #19177C">cellCount</span><span style="color: #BBB"> </span><span style="color: #008000; font-weight: bold">do</span>
+    <span style="color: #BBB">			</span><span style="color: #008000; font-weight: bold">local</span><span style="color: #BBB"> </span><span style="color: #19177C">obstacle</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span>(<span style="color: #19177C">side</span>[<span style="color: #19177C">i</span>]<span style="color: #BBB"> </span><span style="color: #666">==</span><span style="color: #BBB"> </span><span style="color: #19177C">SectorInfo</span>.MaxCost<span style="color: #BBB"> </span><span style="color: #A2F; font-weight: bold">or</span><span style="color: #BBB"> </span><span style="color: #19177C">sideAdj</span>[<span style="color: #19177C">i</span>]<span style="color: #BBB"> </span><span style="color: #666">==</span><span style="color: #BBB"> </span><span style="color: #19177C">SectorInfo</span>.MaxCost)
+    <span style="color: #BBB">			</span><span style="color: #008000; font-weight: bold">if</span><span style="color: #BBB"> </span>(<span style="color: #19177C">obstacle</span><span style="color: #BBB"> </span><span style="color: #666">==</span><span style="color: #BBB"> </span><span style="color: #008000; font-weight: bold">true</span>)<span style="color: #BBB"> </span><span style="color: #666">==</span><span style="color: #BBB"> </span>(<span style="color: #19177C">openPos</span><span style="color: #BBB"> </span><span style="color: #666">~=</span><span style="color: #BBB"> </span><span style="color: #008000; font-weight: bold">nil</span>)<span style="color: #BBB"> </span><span style="color: #008000; font-weight: bold">then</span>
+    <span style="color: #BBB">				</span><span style="color: #008000; font-weight: bold">if</span><span style="color: #BBB"> </span><span style="color: #19177C">obstacle</span><span style="color: #BBB"> </span><span style="color: #008000; font-weight: bold">then</span>
+    <span style="color: #BBB">					</span><span style="color: #008000; font-weight: bold">local</span><span style="color: #BBB"> </span><span style="color: #19177C">portalPos</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #008000">math.floor</span>((<span style="color: #19177C">i</span><span style="color: #BBB"> </span><span style="color: #666">+</span><span style="color: #BBB"> </span><span style="color: #19177C">openPos</span>)<span style="color: #BBB"> </span><span style="color: #666">/</span><span style="color: #BBB"> </span><span style="color: #666">2</span>)
+    <span style="color: #BBB">					</span><span style="color: #19177C">sector</span>:<span style="color: #00F">AddPortal</span>(<span style="color: #19177C">portalPos</span>,<span style="color: #BBB"> </span><span style="color: #19177C">sideId</span>)
+    <span style="color: #BBB">					</span><span style="color: #19177C">sectorAdj</span>:<span style="color: #00F">AddPortal</span>(<span style="color: #19177C">portalPos</span>,<span style="color: #BBB"> </span><span style="color: #19177C">sideIdAdj</span>)
+    <span style="color: #BBB">					</span><span style="color: #19177C">openPos</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #008000; font-weight: bold">nil</span>
+    <span style="color: #BBB">				</span><span style="color: #008000; font-weight: bold">else</span>
+    <span style="color: #BBB">					</span><span style="color: #19177C">openPos</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">i</span>
+    <span style="color: #BBB">				</span><span style="color: #008000; font-weight: bold">end</span>
+    <span style="color: #BBB">			</span><span style="color: #008000; font-weight: bold">end</span>
+    <span style="color: #BBB">		</span><span style="color: #008000; font-weight: bold">end</span>
+
+    <span style="color: #BBB">		</span><span style="color: #008000; font-weight: bold">if</span><span style="color: #BBB"> </span><span style="color: #19177C">openPos</span><span style="color: #BBB"> </span><span style="color: #666">~=</span><span style="color: #BBB"> </span><span style="color: #008000; font-weight: bold">nil</span><span style="color: #BBB"> </span><span style="color: #008000; font-weight: bold">then</span>
+    <span style="color: #BBB">			</span><span style="color: #008000; font-weight: bold">local</span><span style="color: #BBB"> </span><span style="color: #19177C">portalPos</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #008000">math.floor</span>((<span style="color: #19177C">cellCount</span><span style="color: #BBB"> </span><span style="color: #666">+</span><span style="color: #BBB"> </span><span style="color: #19177C">openPos</span>)<span style="color: #BBB"> </span><span style="color: #666">/</span><span style="color: #BBB"> </span><span style="color: #666">2</span>)
+    <span style="color: #BBB">			</span><span style="color: #19177C">sector</span>:<span style="color: #00F">AddPortal</span>(<span style="color: #19177C">portalPos</span>,<span style="color: #BBB"> </span><span style="color: #19177C">sideId</span>)
+    <span style="color: #BBB">			</span><span style="color: #19177C">sectorAdj</span>:<span style="color: #00F">AddPortal</span>(<span style="color: #19177C">portalPos</span>,<span style="color: #BBB"> </span><span style="color: #19177C">sideIdAdj</span>)
+    <span style="color: #BBB">		</span><span style="color: #008000; font-weight: bold">end</span>
+    <span style="color: #BBB">	</span><span style="color: #008000; font-weight: bold">end</span>
+    <span style="color: #BBB">	</span><span style="color: #19177C">debug</span>.<span style="color: #00F">profileend</span>()
+    <span style="color: #008000; font-weight: bold">end</span>
+    </pre></div>
+
+    <p>The portals are then used to create a weighted graph that will help with calculating the approximate path from a source sector to a target sector.</p>
+    <p>An edge between two portals exists only if the path between them isn't blocked by an obstacle. The weight of the edge is equal to the amount of
+    cells traversed from one portal to the other in a simple Flood Fill algorithm.</p>
+
+    <div class="fig-container" style="text-align: center">
+        <figure>
+            <img src="img/portalexample1.png" alt="">
+            <figcaption>A visualization of the portal graph at the edge between two sectors. </figcaption>
+        </figure>
+        <figure>
+            <img src="img/portalexample2.png" alt="">
+            <figcaption>A larger portal graph generated around a few houses. Sectors that contain no obstacles form diamond-shaped graphs.</figcaption>
+        </figure>
+    </div>
+
+    <p>Each graph node gets assigned its own ID based on the global position of its cell. The graph is stored in a Lua table using the IDs as indexes.</p>
+
+    <!-- HTML generated using hilite.me --><div style="background: #f8f8f8; overflow:auto;width:auto;border:solid gray;border-width:.1em .1em .1em .8em;padding:.2em .6em;"><pre style="margin: 0; line-height: 125%;"><span></span><span style="color: #008000; font-weight: bold">local</span><span style="color: #BBB"> </span><span style="color: #008000; font-weight: bold">function</span><span style="color: #BBB"> </span><span style="color: #00F">FloodFill</span>(<span style="color: #19177C">startPos</span>:<span style="color: #BBB"> </span>Vector2,<span style="color: #BBB"> </span><span style="color: #19177C">sectorPos</span>:<span style="color: #BBB"> </span>Vector2)
+    <span style="color: #BBB">	</span><span style="color: #19177C">debug</span>.<span style="color: #00F">profilebegin</span>(<span style="color: #BA2121">&quot;Portal Flood Fill&quot;</span>)
+    <span style="color: #BBB">	</span><span style="color: #008000; font-weight: bold">local</span><span style="color: #BBB"> </span><span style="color: #19177C">visited</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span>{}
+    <span style="color: #BBB">	</span><span style="color: #008000; font-weight: bold">for</span><span style="color: #BBB"> </span><span style="color: #19177C">i</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #666">1</span>,<span style="color: #BBB"> </span><span style="color: #19177C">cellCount</span><span style="color: #BBB"> </span><span style="color: #008000; font-weight: bold">do</span>
+    <span style="color: #BBB">		</span><span style="color: #19177C">visited</span>[<span style="color: #19177C">i</span>]<span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span>{}
+    <span style="color: #BBB">		</span><span style="color: #008000; font-weight: bold">for</span><span style="color: #BBB"> </span><span style="color: #19177C">j</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #666">1</span>,<span style="color: #BBB"> </span><span style="color: #19177C">cellCount</span><span style="color: #BBB"> </span><span style="color: #008000; font-weight: bold">do</span>
+    <span style="color: #BBB">			</span><span style="color: #19177C">visited</span>[<span style="color: #19177C">i</span>][<span style="color: #19177C">j</span>]<span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">Utils</span>.inf
+    <span style="color: #BBB">		</span><span style="color: #008000; font-weight: bold">end</span>
+    <span style="color: #BBB">	</span><span style="color: #008000; font-weight: bold">end</span>
+
+    <span style="color: #BBB">	</span><span style="color: #008000; font-weight: bold">local</span><span style="color: #BBB"> </span><span style="color: #19177C">sector</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">sectorGrid</span>[<span style="color: #19177C">sectorPos</span>.X][<span style="color: #19177C">sectorPos</span>.Y]
+
+    <span style="color: #BBB">	</span><span style="color: #008000; font-weight: bold">local</span><span style="color: #BBB"> </span><span style="color: #19177C">q</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">Queue</span>.<span style="color: #00F">new</span>()
+    <span style="color: #BBB">	</span><span style="color: #19177C">visited</span>[<span style="color: #19177C">startPos</span>.X][<span style="color: #19177C">startPos</span>.Y]<span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">sector</span>.CostField[<span style="color: #19177C">startPos</span>.X][<span style="color: #19177C">startPos</span>.Y]
+    <span style="color: #BBB">	</span><span style="color: #19177C">q</span>:<span style="color: #00F">Enqueue</span>(<span style="color: #19177C">startPos</span>)
+
+    <span style="color: #BBB">	</span><span style="color: #008000; font-weight: bold">while</span><span style="color: #BBB"> </span><span style="color: #A2F; font-weight: bold">not</span><span style="color: #BBB"> </span><span style="color: #19177C">q</span>:<span style="color: #00F">IsEmpty</span>()<span style="color: #BBB"> </span><span style="color: #008000; font-weight: bold">do</span>
+    <span style="color: #BBB">		</span><span style="color: #008000; font-weight: bold">local</span><span style="color: #BBB"> </span><span style="color: #19177C">curr</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">q</span>:<span style="color: #00F">Dequeue</span>()
+
+    <span style="color: #BBB">		</span><span style="color: #008000; font-weight: bold">for</span><span style="color: #BBB"> </span><span style="color: #19177C">_</span>,<span style="color: #BBB"> </span><span style="color: #19177C">dir</span><span style="color: #BBB"> </span><span style="color: #008000; font-weight: bold">in</span><span style="color: #BBB"> </span><span style="color: #19177C">dirs</span><span style="color: #BBB"> </span><span style="color: #008000; font-weight: bold">do</span>
+    <span style="color: #BBB">			</span><span style="color: #008000; font-weight: bold">local</span><span style="color: #BBB"> </span><span style="color: #008000">next</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">curr</span><span style="color: #BBB"> </span><span style="color: #666">+</span><span style="color: #BBB"> </span><span style="color: #19177C">dir</span>
+
+    <span style="color: #BBB">			</span><span style="color: #008000; font-weight: bold">if</span><span style="color: #BBB"> </span><span style="color: #A2F; font-weight: bold">not</span><span style="color: #BBB"> </span><span style="color: #19177C">Utils</span>.<span style="color: #00F">IsValidCellPos</span>(<span style="color: #008000">next</span>)<span style="color: #BBB"> </span><span style="color: #008000; font-weight: bold">then</span>
+    <span style="color: #BBB">				</span><span style="color: #19177C">continue</span>
+    <span style="color: #BBB">			</span><span style="color: #008000; font-weight: bold">end</span>
+    <span style="color: #BBB">			</span>
+    <span style="color: #BBB">			</span><span style="color: #008000; font-weight: bold">if</span><span style="color: #BBB"> </span><span style="color: #19177C">sector</span>.CostField[<span style="color: #008000">next</span>.<span style="color: #19177C">X</span>][<span style="color: #008000">next</span>.<span style="color: #19177C">Y</span>]<span style="color: #BBB"> </span><span style="color: #666">==</span><span style="color: #BBB"> </span><span style="color: #19177C">SectorInfo</span>.MaxCost<span style="color: #BBB"> </span><span style="color: #008000; font-weight: bold">then</span>
+    <span style="color: #BBB">				</span><span style="color: #19177C">sector</span>.CellRegion[<span style="color: #008000">next</span>.<span style="color: #19177C">X</span>][<span style="color: #008000">next</span>.<span style="color: #19177C">Y</span>]<span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">sector</span>.CellRegion[<span style="color: #19177C">startPos</span>.X][<span style="color: #19177C">startPos</span>.Y]
+    <span style="color: #BBB">				</span><span style="color: #19177C">continue</span>
+    <span style="color: #BBB">			</span><span style="color: #008000; font-weight: bold">end</span>
+
+    <span style="color: #BBB">			</span><span style="color: #008000; font-weight: bold">local</span><span style="color: #BBB"> </span><span style="color: #19177C">cost</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">visited</span>[<span style="color: #19177C">curr</span>.X][<span style="color: #19177C">curr</span>.Y]<span style="color: #BBB"> </span><span style="color: #666">+</span><span style="color: #BBB"> </span><span style="color: #19177C">sector</span>.CostField[<span style="color: #008000">next</span>.<span style="color: #19177C">X</span>][<span style="color: #008000">next</span>.<span style="color: #19177C">Y</span>]
+    <span style="color: #BBB">			</span><span style="color: #008000; font-weight: bold">if</span><span style="color: #BBB"> </span><span style="color: #19177C">visited</span>[<span style="color: #008000">next</span>.<span style="color: #19177C">X</span>][<span style="color: #008000">next</span>.<span style="color: #19177C">Y</span>]<span style="color: #BBB"> </span><span style="color: #666">&gt;</span><span style="color: #BBB"> </span><span style="color: #19177C">cost</span><span style="color: #BBB"> </span><span style="color: #008000; font-weight: bold">then</span>
+    <span style="color: #BBB">				</span><span style="color: #19177C">visited</span>[<span style="color: #008000">next</span>.<span style="color: #19177C">X</span>][<span style="color: #008000">next</span>.<span style="color: #19177C">Y</span>]<span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">cost</span>
+    <span style="color: #BBB">				</span><span style="color: #19177C">sector</span>.CellRegion[<span style="color: #008000">next</span>.<span style="color: #19177C">X</span>][<span style="color: #008000">next</span>.<span style="color: #19177C">Y</span>]<span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">sector</span>.CellRegion[<span style="color: #19177C">startPos</span>.X][<span style="color: #19177C">startPos</span>.Y]
+    <span style="color: #BBB">				</span><span style="color: #19177C">q</span>:<span style="color: #00F">Enqueue</span>(<span style="color: #008000">next</span>)
+    <span style="color: #BBB">			</span><span style="color: #008000; font-weight: bold">end</span>
+    <span style="color: #BBB">		</span><span style="color: #008000; font-weight: bold">end</span>
+    <span style="color: #BBB">	</span><span style="color: #008000; font-weight: bold">end</span>
+
+    <span style="color: #BBB">	</span><span style="color: #19177C">debug</span>.<span style="color: #00F">profileend</span>()
+    <span style="color: #BBB">	</span><span style="color: #008000; font-weight: bold">return</span><span style="color: #BBB"> </span><span style="color: #19177C">visited</span>
+    <span style="color: #008000; font-weight: bold">end</span>
+    </pre></div>
+
+
+    <!-- HTML generated using hilite.me --><div style="background: #f8f8f8; overflow:auto;width:auto;border:solid gray;border-width:.1em .1em .1em .8em;padding:.2em .6em;"><pre style="margin: 0; line-height: 125%;"><span></span><span style="color: #008000; font-weight: bold">local</span><span style="color: #BBB"> </span><span style="color: #008000; font-weight: bold">function</span><span style="color: #BBB"> </span><span style="color: #00F">ConnectPortalsFlood</span>(<span style="color: #19177C">sectorPos</span>:<span style="color: #BBB"> </span>Vector2)
+    <span style="color: #BBB">	</span><span style="color: #19177C">debug</span>.<span style="color: #00F">profilebegin</span>(<span style="color: #BA2121">&quot;Portal Graph Generation&quot;</span>)
+    <span style="color: #BBB">	</span><span style="color: #008000; font-weight: bold">local</span><span style="color: #BBB"> </span><span style="color: #19177C">sector</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">sectorGrid</span>[<span style="color: #19177C">sectorPos</span>.X][<span style="color: #19177C">sectorPos</span>.Y]
+    <span style="color: #BBB">	</span><span style="color: #008000; font-weight: bold">local</span><span style="color: #BBB"> </span><span style="color: #19177C">chunk</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">debugChunk</span>[<span style="color: #19177C">sectorPos</span>.X][<span style="color: #19177C">sectorPos</span>.Y]
+
+    <span style="color: #BBB">	</span><span style="color: #3D7B7B; font-style: italic">--clear this sector&#39;s graph</span>
+    <span style="color: #BBB">	</span><span style="color: #008000; font-weight: bold">for</span><span style="color: #BBB"> </span><span style="color: #19177C">side</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #666">0</span>,<span style="color: #BBB"> </span><span style="color: #666">3</span><span style="color: #BBB"> </span><span style="color: #008000; font-weight: bold">do</span>
+    <span style="color: #BBB">		</span><span style="color: #008000; font-weight: bold">for</span><span style="color: #BBB"> </span><span style="color: #19177C">_</span>,<span style="color: #BBB"> </span><span style="color: #19177C">portal</span><span style="color: #BBB"> </span><span style="color: #008000; font-weight: bold">in</span><span style="color: #BBB"> </span><span style="color: #19177C">sector</span>.Portals[<span style="color: #19177C">side</span>]<span style="color: #BBB"> </span><span style="color: #008000; font-weight: bold">do</span>
+    <span style="color: #BBB">			</span><span style="color: #008000; font-weight: bold">local</span><span style="color: #BBB"> </span><span style="color: #19177C">nodeId</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">Utils</span>.<span style="color: #00F">ConvertPortalPosToNumber</span>(<span style="color: #19177C">portal</span>,<span style="color: #BBB"> </span><span style="color: #19177C">sectorPos</span>,<span style="color: #BBB"> </span><span style="color: #19177C">side</span>)
+    <span style="color: #BBB">			</span><span style="color: #008000; font-weight: bold">if</span><span style="color: #BBB"> </span><span style="color: #19177C">portalGraph</span>[<span style="color: #19177C">nodeId</span>]<span style="color: #BBB"> </span><span style="color: #666">==</span><span style="color: #BBB"> </span><span style="color: #008000; font-weight: bold">nil</span><span style="color: #BBB"> </span><span style="color: #008000; font-weight: bold">then</span>
+    <span style="color: #BBB">				</span><span style="color: #19177C">portalGraph</span>[<span style="color: #19177C">nodeId</span>]<span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span>{}
+    <span style="color: #BBB">			</span><span style="color: #008000; font-weight: bold">else</span>
+    <span style="color: #BBB">				</span><span style="color: #19177C">table</span>.<span style="color: #00F">clear</span>(<span style="color: #19177C">portalGraph</span>[<span style="color: #19177C">nodeId</span>])
+    <span style="color: #BBB">			</span><span style="color: #008000; font-weight: bold">end</span>
+    <span style="color: #BBB">		</span><span style="color: #008000; font-weight: bold">end</span>
+    <span style="color: #BBB">	</span><span style="color: #008000; font-weight: bold">end</span>
+
+    <span style="color: #BBB">	</span><span style="color: #19177C">table</span>.<span style="color: #00F">clear</span>(<span style="color: #19177C">sector</span>.CellRegion)
+    <span style="color: #BBB">	</span><span style="color: #008000; font-weight: bold">for</span><span style="color: #BBB"> </span><span style="color: #19177C">i</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #666">1</span>,<span style="color: #BBB"> </span><span style="color: #19177C">cellCount</span><span style="color: #BBB"> </span><span style="color: #008000; font-weight: bold">do</span>
+    <span style="color: #BBB">		</span><span style="color: #19177C">sector</span>.CellRegion[<span style="color: #19177C">i</span>]<span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span>{}
+    <span style="color: #BBB">		</span><span style="color: #008000; font-weight: bold">for</span><span style="color: #BBB"> </span><span style="color: #19177C">j</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #666">1</span>,<span style="color: #BBB"> </span><span style="color: #19177C">cellCount</span><span style="color: #BBB"> </span><span style="color: #008000; font-weight: bold">do</span>
+    <span style="color: #BBB">			</span><span style="color: #19177C">sector</span>.CellRegion[<span style="color: #19177C">i</span>][<span style="color: #19177C">j</span>]<span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #666">0</span>
+    <span style="color: #BBB">		</span><span style="color: #008000; font-weight: bold">end</span>
+    <span style="color: #BBB">	</span><span style="color: #008000; font-weight: bold">end</span>
+    <span style="color: #BBB">	</span><span style="color: #008000; font-weight: bold">local</span><span style="color: #BBB"> </span><span style="color: #19177C">region</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #666">0</span>
+
+    <span style="color: #BBB">	</span><span style="color: #008000; font-weight: bold">for</span><span style="color: #BBB"> </span><span style="color: #19177C">sideSource</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #666">0</span>,<span style="color: #BBB"> </span><span style="color: #666">3</span><span style="color: #BBB"> </span><span style="color: #008000; font-weight: bold">do</span>
+    <span style="color: #BBB">		</span><span style="color: #008000; font-weight: bold">local</span><span style="color: #BBB"> </span><span style="color: #19177C">nodeIds</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span>{}
+    <span style="color: #BBB">		</span><span style="color: #3D7B7B; font-style: italic">--internal edges</span>
+    <span style="color: #BBB">		</span><span style="color: #008000; font-weight: bold">for</span><span style="color: #BBB"> </span><span style="color: #19177C">_</span>,<span style="color: #BBB"> </span><span style="color: #19177C">portalSource</span><span style="color: #BBB"> </span><span style="color: #008000; font-weight: bold">in</span><span style="color: #BBB"> </span><span style="color: #19177C">sector</span>.Portals[<span style="color: #19177C">sideSource</span>]<span style="color: #BBB"> </span><span style="color: #008000; font-weight: bold">do</span><span style="color: #BBB">	</span>
+    <span style="color: #BBB">			</span><span style="color: #3D7B7B; font-style: italic">--divides cells into regions based on accessibility; useful for establishing correct pathing between sectors</span>
+    <span style="color: #BBB">			</span><span style="color: #008000; font-weight: bold">if</span><span style="color: #BBB"> </span><span style="color: #19177C">sector</span>.CellRegion[<span style="color: #19177C">portalSource</span>.X][<span style="color: #19177C">portalSource</span>.Y]<span style="color: #BBB"> </span><span style="color: #666">==</span><span style="color: #BBB"> </span><span style="color: #666">0</span><span style="color: #BBB"> </span><span style="color: #008000; font-weight: bold">then</span>
+    <span style="color: #BBB">				</span><span style="color: #19177C">region</span><span style="color: #BBB"> </span><span style="color: #666">+=</span><span style="color: #BBB"> </span><span style="color: #666">1</span>
+    <span style="color: #BBB">				</span><span style="color: #19177C">sector</span>.CellRegion[<span style="color: #19177C">portalSource</span>.X][<span style="color: #19177C">portalSource</span>.Y]<span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">region</span>
+    <span style="color: #BBB">			</span><span style="color: #008000; font-weight: bold">end</span>
+    <span style="color: #BBB">			</span><span style="color: #008000; font-weight: bold">local</span><span style="color: #BBB"> </span><span style="color: #19177C">dists</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #00F">FloodFill</span>(<span style="color: #19177C">portalSource</span>,<span style="color: #BBB"> </span><span style="color: #19177C">sectorPos</span>)
+
+    <span style="color: #BBB">			</span><span style="color: #3D7B7B; font-style: italic">--assigns a unique id to each portal in the graph adjacency list</span>
+    <span style="color: #BBB">			</span><span style="color: #008000; font-weight: bold">local</span><span style="color: #BBB"> </span><span style="color: #19177C">nodeId</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">Utils</span>.<span style="color: #00F">ConvertPortalPosToNumber</span>(<span style="color: #19177C">portalSource</span>,<span style="color: #BBB"> </span><span style="color: #19177C">sectorPos</span>,<span style="color: #BBB"> </span><span style="color: #19177C">sideSource</span>)
+    <span style="color: #BBB">			</span><span style="color: #008000">table.insert</span>(<span style="color: #19177C">nodeIds</span>,<span style="color: #BBB"> </span><span style="color: #19177C">nodeId</span>)<span style="color: #BBB"> </span><span style="color: #3D7B7B; font-style: italic">--no need to recalculate node ids for this side</span>
+    <span style="color: #BBB">			</span><span style="color: #008000; font-weight: bold">local</span><span style="color: #BBB"> </span><span style="color: #19177C">portalInfo</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span>{
+    <span style="color: #BBB">				</span><span style="color: #19177C">SectorPos</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">sectorPos</span>,
+    <span style="color: #BBB">				</span><span style="color: #19177C">CellPos</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">portalSource</span>,
+    <span style="color: #BBB">				</span><span style="color: #19177C">Side</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">sideSource</span>,
+    <span style="color: #BBB">				</span><span style="color: #19177C">Region</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">sector</span>.CellRegion[<span style="color: #19177C">portalSource</span>.X][<span style="color: #19177C">portalSource</span>.Y],
+    <span style="color: #BBB">				</span><span style="color: #19177C">Index</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">sector</span>:<span style="color: #00F">GetSideIndexFromCellPos</span>(<span style="color: #19177C">portalSource</span>,<span style="color: #BBB"> </span><span style="color: #19177C">sideSource</span>)
+    <span style="color: #BBB">			</span>}
+    <span style="color: #BBB">			</span><span style="color: #19177C">portalFromId</span>[<span style="color: #19177C">nodeId</span>]<span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">portalInfo</span>
+
+    <span style="color: #BBB">			</span><span style="color: #00F">DebugInsertProperties</span>(<span style="color: #19177C">chunk</span>.Display[<span style="color: #19177C">DebugEnums</span>.DebugDisplayMode.Cost],<span style="color: #BBB"> </span>{
+    <span style="color: #BBB">				</span><span style="color: #19177C">Type</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">DebugEnums</span>.DebugObject.Text,
+    <span style="color: #BBB">				</span><span style="color: #19177C">SectorPosition</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">sectorPos</span>,
+    <span style="color: #BBB">				</span><span style="color: #19177C">Position</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #00F">DebugGetCellCenter</span>(<span style="color: #19177C">portalSource</span>,<span style="color: #BBB"> </span><span style="color: #19177C">sectorPos</span>)<span style="color: #BBB"> </span><span style="color: #666">+</span><span style="color: #BBB"> </span><span style="color: #19177C">Vector3</span>.yAxis<span style="color: #BBB"> </span><span style="color: #666">*</span><span style="color: #BBB"> </span><span style="color: #19177C">sector</span>.Heightmap[<span style="color: #19177C">portalSource</span>.X][<span style="color: #19177C">portalSource</span>.Y],
+    <span style="color: #BBB">				</span><span style="color: #19177C">Text</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">nodeId</span>,
+    <span style="color: #BBB">				</span><span style="color: #19177C">Color</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">Color3</span>.<span style="color: #00F">new</span>(<span style="color: #666">1</span>,<span style="color: #BBB"> </span><span style="color: #666">0</span>,<span style="color: #BBB"> </span><span style="color: #666">0</span>),
+    <span style="color: #BBB">				</span><span style="color: #19177C">FontSize</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #666">12</span>,
+    <span style="color: #BBB">			</span>})
+
+    <span style="color: #BBB">			</span><span style="color: #008000; font-weight: bold">for</span><span style="color: #BBB"> </span><span style="color: #19177C">sideTarget</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #666">0</span>,<span style="color: #BBB"> </span><span style="color: #666">3</span><span style="color: #BBB"> </span><span style="color: #008000; font-weight: bold">do</span>
+    <span style="color: #BBB">				</span><span style="color: #008000; font-weight: bold">for</span><span style="color: #BBB"> </span><span style="color: #19177C">_</span>,<span style="color: #BBB"> </span><span style="color: #19177C">portalTarget</span><span style="color: #BBB"> </span><span style="color: #008000; font-weight: bold">in</span><span style="color: #BBB"> </span><span style="color: #19177C">sector</span>.Portals[<span style="color: #19177C">sideTarget</span>]<span style="color: #BBB"> </span><span style="color: #008000; font-weight: bold">do</span>
+    <span style="color: #BBB">					</span><span style="color: #008000; font-weight: bold">if</span><span style="color: #BBB"> </span>(<span style="color: #19177C">portalSource</span><span style="color: #BBB"> </span><span style="color: #666">==</span><span style="color: #BBB"> </span><span style="color: #19177C">portalTarget</span><span style="color: #BBB"> </span><span style="color: #A2F; font-weight: bold">and</span><span style="color: #BBB"> </span><span style="color: #19177C">sideSource</span><span style="color: #BBB"> </span><span style="color: #666">==</span><span style="color: #BBB"> </span><span style="color: #19177C">sideTarget</span>)<span style="color: #BBB"> </span><span style="color: #A2F; font-weight: bold">or</span><span style="color: #BBB"> </span><span style="color: #19177C">dists</span>[<span style="color: #19177C">portalTarget</span>.X][<span style="color: #19177C">portalTarget</span>.Y]<span style="color: #BBB"> </span><span style="color: #666">==</span><span style="color: #BBB"> </span><span style="color: #19177C">Utils</span>.inf<span style="color: #BBB"> </span><span style="color: #008000; font-weight: bold">then</span>
+    <span style="color: #BBB">						</span><span style="color: #19177C">continue</span>
+    <span style="color: #BBB">					</span><span style="color: #008000; font-weight: bold">end</span>
+
+    <span style="color: #BBB">					</span><span style="color: #008000; font-weight: bold">local</span><span style="color: #BBB"> </span><span style="color: #19177C">edge</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span>{
+    <span style="color: #BBB">						</span><span style="color: #19177C">TargetSectorPos</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">sectorPos</span>,
+    <span style="color: #BBB">						</span><span style="color: #19177C">Target</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">portalTarget</span>,
+    <span style="color: #BBB">						</span><span style="color: #19177C">TargetSide</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">sideTarget</span>,
+    <span style="color: #BBB">						</span><span style="color: #19177C">Distance</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">dists</span>[<span style="color: #19177C">portalTarget</span>.X][<span style="color: #19177C">portalTarget</span>.Y]
+    <span style="color: #BBB">					</span>}
+    <span style="color: #BBB">					</span><span style="color: #008000">table.insert</span>(<span style="color: #19177C">portalGraph</span>[<span style="color: #19177C">nodeId</span>],<span style="color: #BBB"> </span><span style="color: #19177C">edge</span>)
+
+    <span style="color: #BBB">					</span><span style="color: #00F">DebugInsertProperties</span>(<span style="color: #19177C">chunk</span>.Display[<span style="color: #19177C">DebugEnums</span>.DebugDisplayMode.Cost],<span style="color: #BBB"> </span>{
+    <span style="color: #BBB">						</span><span style="color: #19177C">Type</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">DebugEnums</span>.DebugObject.Line,
+    <span style="color: #BBB">						</span><span style="color: #19177C">SectorPosition</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">sectorPos</span>,
+    <span style="color: #BBB">						</span><span style="color: #19177C">Point1</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #00F">DebugGetCellCenter</span>(<span style="color: #19177C">portalSource</span>,<span style="color: #BBB"> </span><span style="color: #19177C">sectorPos</span>)<span style="color: #BBB"> </span><span style="color: #666">+</span><span style="color: #BBB"> </span><span style="color: #19177C">Vector3</span>.yAxis<span style="color: #BBB"> </span><span style="color: #666">*</span><span style="color: #BBB"> </span><span style="color: #19177C">sector</span>.Heightmap[<span style="color: #19177C">portalSource</span>.X][<span style="color: #19177C">portalSource</span>.Y],
+    <span style="color: #BBB">						</span><span style="color: #19177C">Point2</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #00F">DebugGetCellCenter</span>(<span style="color: #19177C">portalTarget</span>,<span style="color: #BBB"> </span><span style="color: #19177C">sectorPos</span>)<span style="color: #BBB"> </span><span style="color: #666">+</span><span style="color: #BBB"> </span><span style="color: #19177C">Vector3</span>.yAxis<span style="color: #BBB"> </span><span style="color: #666">*</span><span style="color: #BBB"> </span><span style="color: #19177C">sector</span>.Heightmap[<span style="color: #19177C">portalTarget</span>.X][<span style="color: #19177C">portalTarget</span>.Y],
+    <span style="color: #BBB">						</span><span style="color: #19177C">Color</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">DebugPortalColor</span><span style="color: #BBB">	</span>
+    <span style="color: #BBB">					</span>})
+    <span style="color: #BBB">				</span><span style="color: #008000; font-weight: bold">end</span>
+    <span style="color: #BBB">			</span><span style="color: #008000; font-weight: bold">end</span>
+
+    <span style="color: #BBB">			</span><span style="color: #19177C">table</span>.<span style="color: #00F">clear</span>(<span style="color: #19177C">dists</span>)
+    <span style="color: #BBB">		</span><span style="color: #008000; font-weight: bold">end</span>
+
+    <span style="color: #BBB">		</span><span style="color: #3D7B7B; font-style: italic">--external edges</span>
+    <span style="color: #BBB">		</span><span style="color: #008000; font-weight: bold">local</span><span style="color: #BBB"> </span><span style="color: #19177C">sideAdj</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span>(<span style="color: #19177C">sideSource</span><span style="color: #BBB"> </span><span style="color: #666">+</span><span style="color: #BBB"> </span><span style="color: #666">2</span>)<span style="color: #BBB"> </span><span style="color: #666">%</span><span style="color: #BBB"> </span><span style="color: #666">4</span>
+    <span style="color: #BBB">		</span><span style="color: #008000; font-weight: bold">local</span><span style="color: #BBB"> </span><span style="color: #19177C">sectorAdjPos</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">sectorPos</span><span style="color: #BBB"> </span><span style="color: #666">+</span><span style="color: #BBB"> </span><span style="color: #19177C">dirs</span>[<span style="color: #19177C">sideSource</span><span style="color: #BBB"> </span><span style="color: #666">+</span><span style="color: #BBB"> </span><span style="color: #666">1</span>]
+    <span style="color: #BBB">		</span><span style="color: #008000; font-weight: bold">if</span><span style="color: #BBB"> </span><span style="color: #A2F; font-weight: bold">not</span><span style="color: #BBB"> </span><span style="color: #19177C">Utils</span>.<span style="color: #00F">IsValidSectorPos</span>(<span style="color: #19177C">sectorAdjPos</span>)<span style="color: #BBB"> </span><span style="color: #008000; font-weight: bold">then</span>
+    <span style="color: #BBB">			</span><span style="color: #19177C">continue</span>
+    <span style="color: #BBB">		</span><span style="color: #008000; font-weight: bold">end</span>
+
+    <span style="color: #BBB">		</span><span style="color: #008000; font-weight: bold">local</span><span style="color: #BBB"> </span><span style="color: #19177C">sectorAdj</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">sectorGrid</span>[<span style="color: #19177C">sectorAdjPos</span>.X][<span style="color: #19177C">sectorAdjPos</span>.Y]
+
+    <span style="color: #BBB">		</span><span style="color: #008000; font-weight: bold">for</span><span style="color: #BBB"> </span><span style="color: #19177C">idx</span>,<span style="color: #BBB"> </span><span style="color: #19177C">portalSource</span><span style="color: #BBB"> </span><span style="color: #008000; font-weight: bold">in</span><span style="color: #BBB"> </span><span style="color: #19177C">sector</span>.Portals[<span style="color: #19177C">sideSource</span>]<span style="color: #BBB"> </span><span style="color: #008000; font-weight: bold">do</span>
+    <span style="color: #BBB">			</span><span style="color: #008000; font-weight: bold">local</span><span style="color: #BBB"> </span><span style="color: #19177C">portalTarget</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">sectorAdj</span>.Portals[<span style="color: #19177C">sideAdj</span>][<span style="color: #19177C">idx</span>]
+
+    <span style="color: #BBB">			</span><span style="color: #008000; font-weight: bold">local</span><span style="color: #BBB"> </span><span style="color: #19177C">edge</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span>{
+    <span style="color: #BBB">				</span><span style="color: #19177C">TargetSectorPos</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">sectorAdjPos</span>,
+    <span style="color: #BBB">				</span><span style="color: #19177C">Target</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">portalTarget</span>,
+    <span style="color: #BBB">				</span><span style="color: #19177C">TargetSide</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">sideAdj</span>,
+    <span style="color: #BBB">				</span><span style="color: #19177C">Distance</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #666">1</span>
+    <span style="color: #BBB">			</span>}
+    <span style="color: #BBB">			</span><span style="color: #008000">table.insert</span>(<span style="color: #19177C">portalGraph</span>[<span style="color: #19177C">nodeIds</span>[<span style="color: #19177C">idx</span>]],<span style="color: #BBB"> </span><span style="color: #19177C">edge</span>)
+
+    <span style="color: #BBB">			</span><span style="color: #00F">DebugInsertProperties</span>(<span style="color: #19177C">chunk</span>.Display[<span style="color: #19177C">DebugEnums</span>.DebugDisplayMode.Cost],<span style="color: #BBB"> </span>{
+    <span style="color: #BBB">				</span><span style="color: #19177C">Type</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">DebugEnums</span>.DebugObject.Line,
+    <span style="color: #BBB">				</span><span style="color: #19177C">SectorPosition</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">sectorPos</span>,
+    <span style="color: #BBB">				</span><span style="color: #19177C">Point1</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #00F">DebugGetCellCenter</span>(<span style="color: #19177C">portalSource</span>,<span style="color: #BBB"> </span><span style="color: #19177C">sectorPos</span>)<span style="color: #BBB"> </span><span style="color: #666">+</span><span style="color: #BBB"> </span><span style="color: #19177C">Vector3</span>.yAxis<span style="color: #BBB"> </span><span style="color: #666">*</span><span style="color: #BBB"> </span><span style="color: #19177C">sector</span>.Heightmap[<span style="color: #19177C">portalSource</span>.X][<span style="color: #19177C">portalSource</span>.Y],
+    <span style="color: #BBB">				</span><span style="color: #19177C">Point2</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #00F">DebugGetCellCenter</span>(<span style="color: #19177C">portalTarget</span>,<span style="color: #BBB"> </span><span style="color: #19177C">sectorAdjPos</span>)<span style="color: #BBB"> </span><span style="color: #666">+</span><span style="color: #BBB"> </span><span style="color: #19177C">Vector3</span>.yAxis<span style="color: #BBB"> </span><span style="color: #666">*</span><span style="color: #BBB"> </span><span style="color: #19177C">sectorAdj</span>.Heightmap[<span style="color: #19177C">portalTarget</span>.X][<span style="color: #19177C">portalTarget</span>.Y],
+    <span style="color: #BBB">				</span><span style="color: #19177C">Color</span><span style="color: #BBB"> </span><span style="color: #666">=</span><span style="color: #BBB"> </span><span style="color: #19177C">DebugPortalColor</span><span style="color: #BBB">	</span>
+    <span style="color: #BBB">			</span>})
+    <span style="color: #BBB">		</span><span style="color: #008000; font-weight: bold">end</span>
+    <span style="color: #BBB">	</span><span style="color: #008000; font-weight: bold">end</span>
+    <span style="color: #008000; font-weight: bold">end</span>
+    </pre></div>
+
 </div>
 <div class="infobox" data-title="Approximate Path Calculation">
     <h1>Approximate Path Calculation</h1>
@@ -73,10 +481,35 @@
 </div>
 
 <script>
+    function getCookie(name) {
+        var decodedCookie = decodeURIComponent(document.cookie);
+        var cookieList = decodedCookie.split(';');
+        for(i = 0; i < cookieList.length; i++) {
+            var c = cookieList[i].trim();
+
+            var nameValPair = c.split('=');
+            if(nameValPair[0] === name) {
+                return nameValPair[1];
+            }
+        }
+
+        return "";
+    }
+
+    function setCookie(name, val) {
+        document.cookie = name + '=' + val;
+    }
+
+    var infoboxTitle = getCookie("infobox-title");
+    if(infoboxTitle === "") {
+        document.cookie = "infobox-title=Introduction";
+        infoboxTitle = "Introduction";
+    }
+
     var boxes = document.getElementsByClassName("infobox");
     var selectedBox;
     for(i = 0; i < boxes.length; i++) {
-        if(boxes[i].dataset.title === "Map Partitioning") {
+        if(boxes[i].dataset.title === infoboxTitle) {
             boxes[i].style.display = "block";
             selectedBox = boxes[i];
         }
@@ -90,6 +523,7 @@
         selectedBox.style.display = "none";
         box.style.display = "block";
         selectedBox = box;
+        setCookie("infobox-title", element.text);
     }
 </script>
 

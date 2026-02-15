@@ -6,10 +6,12 @@
 .topimg {
     background-color: white;
     position: relative;
-    text-align: center;
+    text-align: left;
     width: 100%;
     height: 15rem;
-    background-image: linear-gradient(to top, rgba(0, 0, 0, 0.5), rgba(255, 255, 255, 0))
+    background-image: linear-gradient(to top, rgba(0, 0, 0, 0.5), rgba(255, 255, 255, 0)), url("img/topimg.png"), url("img/topbg.png");
+    background-position: left top 30%;
+    background-repeat: no-repeat, no-repeat, repeat;
 }
 
 .imgcorner-text {
@@ -48,6 +50,7 @@
 .topnav a:hover, .dropdown:hover .dropdown-btn {
     background-color: #ddd;
     color: black;
+    cursor: pointer;
 }
 
 .topnav a.active {
@@ -99,32 +102,33 @@
 }
 
 .infobox {
-    width: 50%;
+    width: 75%;
 
     min-height: 100px;
     overflow: hidden;
 
-    margin-top: 20px;
-    margin-left: auto;
-    margin-right: auto;
+    margin: 20px auto;
 
     border-radius: 10px;
-    background-color: floralwhite;
+    background-color: whitesmoke;
     filter: drop-shadow(0 0 15px);
-    /*border: 2px solid blue;*/
     padding: 20px;
 
     display: block;
 }
 
 .infobox img {
+    display: block;
     width: 100%;
     height: 100%;
     max-height: 400px;
     object-fit: contain;
 }
 .infobox figure {
+    display: inline-block;
+    margin: 1%;
     border: 2px silver solid;
+    inline-size: fit-content;
     padding: 5px;
     object-fit: none;
 }
@@ -134,22 +138,30 @@
     font-family: Verdana, sans-serif;
     font-style: italic;
     font-size: 14px;
+    contain: inline-size;
+    margin-block-start: .5em;
     padding: 3px 3px;
     text-align: center;
 }
 
-code {
-    font: 14px Consolas,monospace;
-    color: white;
-    border-radius: 3px;
-    background-clip: padding-box;
-    border: 1px solid #ccc;
-    background-color: #222222;
-    padding: 10px 10px;
-    display: block;
-    white-space: pre-wrap;
-    margin: 0;
-}
+/*.codebox {*/
+/*    border:solid gray;*/
+/*    border-width:.1em .1em .1em .8em;*/
+/*    padding:.2em .6em;*/
+/*}*/
+
+/*code {*/
+/*    font: 14px Consolas,monospace;*/
+/*    color: white;*/
+/*    border-radius: 3px;*/
+/*    background-clip: padding-box;*/
+/*    border: 1px solid #ccc;*/
+/*    background-color: #222222;*/
+/*    padding: 10px 10px;*/
+/*    display: block;*/
+/*    white-space: pre-wrap;*/
+/*    margin: 0;*/
+/*}*/
 
 body {
     background-image: url("img/tilebg.png");
@@ -166,6 +178,14 @@ h1 {
 p {
     font-family: Georgia, serif;
     text-indent: 2em;
+    text-align: justify;
+    text-justify: inter-word;
     font-size: 24px;
     margin-left: 8px;
+    margin-right: 8px;
+}
+ul {
+    font-family: Georgia, serif;
+    font-size: 24px;
+    margin-left: 4em;
 }
