@@ -15,9 +15,8 @@
 }
 
 .imgcorner-text {
-    position: absolute;
+    position: absolute;;
     bottom: 8px;
-    left: 16px;
     color: white;
     font-size: 48px;
     font-family: "Arno Pro";
